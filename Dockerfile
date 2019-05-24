@@ -13,10 +13,12 @@ RUN DATE=$(date -u '+%Y-%m-%d-%H%M UTC') \
 
 FROM arm32v6/alpine:latest
 
-RUN apk --no-cache add bind-tools ca-certificates
+RUN apk --no-cache add bind-tools ca-certificates \
+  && adduser -S cloudflared
 
 COPY --from=builder \
   /go/src/github.com/cloudflare/cloudflared/cmd/cloudflared/cloudflared \
   /usr/local/bin/cloudflared
 
+USER cloudflared
 ENTRYPOINT ["cloudflared"]
