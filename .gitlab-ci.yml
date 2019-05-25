@@ -1,0 +1,29 @@
+image: docker:stable
+
+variables:
+  DOCKER_DRIVER: overlay2
+
+services:
+  - docker:dind
+
+stages:
+  - build
+
+build-armhf:
+  stage: build
+  before_script:
+    - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+  script:
+    - docker build --build-arg ARCH=arm32v6 --build-arg GOARCH=arm --build-arg GOARM=6 -t packerdl/cloudflared:armhf .
+
+build-arm64:
+  stage: build
+  before_script:
+    - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+  script:
+    - docker build --build-arg ARCH=arm64v8 --build-arg GOARCH=arm64 -t packerdl/cloudflared:arm64 .
+
+build-amd64:
+  stage: build
+  script:
+    - docker build --build-arg ARCH=amd64 --build-arg GOARCH=amd64 -t packerdl/cloudflared:amd64 .
