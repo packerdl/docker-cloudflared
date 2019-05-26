@@ -15,7 +15,7 @@ RUN DATE=$(date -u '+%Y-%m-%d-%H%M UTC') \
        go build -v -ldflags="-X 'main.Version=$VERSION' -X 'main.BuildTime=$DATE'" ./
 
 
-FROM $ARCH/alpine:latest
+FROM multiarch/alpine:${ARCH}-latest-stable
 
 RUN apk --no-cache add bind-tools ca-certificates \
   && adduser -S cloudflared

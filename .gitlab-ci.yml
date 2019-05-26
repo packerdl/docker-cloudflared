@@ -14,14 +14,14 @@ build-armhf:
   before_script:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
   script:
-    - docker build --build-arg ARCH=arm32v6 --build-arg GOARCH=arm --build-arg GOARM=6 -t packerdl/cloudflared:armhf .
+    - docker build --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 -t packerdl/cloudflared:armhf .
 
 build-arm64:
   stage: build
   before_script:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
   script:
-    - docker build --build-arg ARCH=arm64v8 --build-arg GOARCH=arm64 -t packerdl/cloudflared:arm64 .
+    - docker build --build-arg ARCH=arm64 --build-arg GOARCH=arm64 -t packerdl/cloudflared:arm64 .
 
 build-amd64:
   stage: build
