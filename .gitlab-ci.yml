@@ -9,21 +9,37 @@ services:
 stages:
   - build
 
-build-armhf:
+build:armhf:
   stage: build
   before_script:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+    - mkdir images
   script:
-    - docker build --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 -t packerdl/cloudflared:armhf .
+    - docker build --pull --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 -t $CI_REGISTRY_IMAGE:armhf .
+    - docker save -o images/cloudflared-armhf.tar $CI_REGISTRY_IMAGE:armhf
+  artifacts:
+    paths:
+      - images
 
-build-arm64:
+build:arm64:
   stage: build
   before_script:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+    - mkdir images
   script:
-    - docker build --build-arg ARCH=arm64 --build-arg GOARCH=arm64 -t packerdl/cloudflared:arm64 .
+    - docker build --pull --build-arg ARCH=arm64 --build-arg GOARCH=arm64 -t $CI_REGISTRY_IMAGE:arm64 .
+    - docker save -o images/cloudflared-arm64.tar $CI_REGISTRY_IMAGE:arm64
+  artifacts:
+    paths:
+      - images
 
-build-amd64:
+build:amd64:
   stage: build
+  before_script:
+    - mkdir images
   script:
-    - docker build --build-arg ARCH=amd64 --build-arg GOARCH=amd64 -t packerdl/cloudflared:amd64 .
+    - docker build --pull --build-arg ARCH=amd64 --build-arg GOARCH=amd64 -t $CI_REGISTRY_IMAGE:amd64 .
+    - docker save -o images/cloudflared-amd64.tar $CI_REGISTRY_IMAGE:amd64
+  artifacts:
+    paths:
+      - images
