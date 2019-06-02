@@ -2,6 +2,7 @@ image: docker:stable
 
 variables:
   DOCKER_DRIVER: overlay2
+  REF: master
 
 services:
   - docker:dind
@@ -10,13 +11,15 @@ stages:
   - identify
   - build
   - push
+  - manifest
 
 identify:
   image: docker:git
   stage: identify
   script:
     - git clone https://github.com/cloudflare/cloudflared.git
-    - echo $(cd cloudflared && git describe --tags --always) | tee VERSION
+    - cd cloudflared && git checkout $REF
+    - echo $(git describe --tags --always) | tee ../VERSION
   artifacts:
     paths:
       - VERSION
@@ -27,7 +30,7 @@ build:arm32v6:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
     - mkdir images
   script:
-    - docker build --pull --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6" .
+    - docker build --pull --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 --build-arg REF=$REF -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6" .
     - docker save -o images/cloudflared-arm32v6.tar "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
   artifacts:
     paths:
@@ -39,7 +42,7 @@ build:arm64:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
     - mkdir images
   script:
-    - docker build --pull --build-arg ARCH=arm64 --build-arg GOARCH=arm64 -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64" .
+    - docker build --pull --build-arg ARCH=arm64 --build-arg GOARCH=arm64 --build-arg REF=$REF -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64" .
     - docker save -o images/cloudflared-arm64.tar "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
   artifacts:
     paths:
@@ -50,7 +53,7 @@ build:amd64:
   before_script:
     - mkdir images
   script:
-    - docker build --pull --build-arg ARCH=amd64 --build-arg GOARCH=amd64 -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64" .
+    - docker build --pull --build-arg ARCH=amd64 --build-arg GOARCH=amd64 --build-arg REF=$REF -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64" .
     - docker save -o images/cloudflared-amd64.tar "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
   artifacts:
     paths:
@@ -58,8 +61,6 @@ build:amd64:
 
 push:
   stage: push
-  variables:
-    DOCKER_CLI_EXPERIMENTAL: "enabled"
   before_script:
     - docker load -i images/cloudflared-amd64.tar
     - docker load -i images/cloudflared-arm64.tar
@@ -70,24 +71,18 @@ push:
     - docker push "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
     - docker push "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
 
-    - docker manifest create "$CI_REGISTRY_IMAGE:latest"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
-    - docker manifest annotate --arch amd64 --os linux
-        "$CI_REGISTRY_IMAGE:latest"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
-    - docker manifest annotate --arch arm64 --os linux
-        "$CI_REGISTRY_IMAGE:latest"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
-    - docker manifest annotate --arch arm --variant v6 --os linux
-        "$CI_REGISTRY_IMAGE:latest"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
-
+manifest:version:
+  stage: manifest
+  variables:
+    DOCKER_CLI_EXPERIMENTAL: "enabled"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
     - docker manifest create "$CI_REGISTRY_IMAGE:$(cat VERSION)"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
-        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+      "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+      "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+      "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+
     - docker manifest annotate --arch amd64 --os linux
         "$CI_REGISTRY_IMAGE:$(cat VERSION)"
         "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
@@ -99,4 +94,30 @@ push:
         "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
 
     - docker manifest push "$CI_REGISTRY_IMAGE:$(cat VERSION)"
+
+manifest:latest:
+  stage: manifest
+  only:
+    variables:
+      - $REF == "master"
+  variables:
+    DOCKER_CLI_EXPERIMENTAL: "enabled"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker manifest create "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+
+    - docker manifest annotate --arch amd64 --os linux
+        "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+    - docker manifest annotate --arch arm64 --os linux
+        "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+    - docker manifest annotate --arch arm --variant v6 --os linux
+        "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+  
     - docker manifest push "$CI_REGISTRY_IMAGE:latest"
