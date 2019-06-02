@@ -21,14 +21,14 @@ identify:
     paths:
       - VERSION
 
-build:armhf:
+build:arm32v6:
   stage: build
   before_script:
     - docker run --rm --privileged multiarch/qemu-user-static:register --reset
     - mkdir images
   script:
-    - docker build --pull --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-armhf" .
-    - docker save -o images/cloudflared-armhf.tar "$CI_REGISTRY_IMAGE:$(cat VERSION)-armhf"
+    - docker build --pull --build-arg ARCH=armhf --build-arg GOARCH=arm --build-arg GOARM=6 -t "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6" .
+    - docker save -o images/cloudflared-arm32v6.tar "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
   artifacts:
     paths:
       - images
@@ -58,12 +58,45 @@ build:amd64:
 
 push:
   stage: push
+  variables:
+    DOCKER_CLI_EXPERIMENTAL: "enabled"
   before_script:
     - docker load -i images/cloudflared-amd64.tar
     - docker load -i images/cloudflared-arm64.tar
-    - docker load -i images/cloudflared-armhf.tar
+    - docker load -i images/cloudflared-arm32v6.tar
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - docker push "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
     - docker push "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
-    - docker push "$CI_REGISTRY_IMAGE:$(cat VERSION)-armhf"
+    - docker push "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+
+    - docker manifest create "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+    - docker manifest annotate --arch amd64 --os linux
+        "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+    - docker manifest annotate --arch arm64 --os linux
+        "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+    - docker manifest annotate --arch arm --variant v6 --os linux
+        "$CI_REGISTRY_IMAGE:latest"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+
+    - docker manifest create "$CI_REGISTRY_IMAGE:$(cat VERSION)"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+    - docker manifest annotate --arch amd64 --os linux
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-amd64"
+    - docker manifest annotate --arch arm64 --os linux
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm64"
+    - docker manifest annotate --arch arm --variant v6 --os linux
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)"
+        "$CI_REGISTRY_IMAGE:$(cat VERSION)-arm32v6"
+
+    - docker manifest push "$CI_REGISTRY_IMAGE:$(cat VERSION)"
+    - docker manifest push "$CI_REGISTRY_IMAGE:latest"
