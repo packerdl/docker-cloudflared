@@ -3,11 +3,13 @@ FROM golang:alpine AS builder
 
 ARG GOARCH=amd64
 ARG GOARM
+ARG REF=master
 
 RUN apk --no-cache add git build-base \
   && go get -v github.com/cloudflare/cloudflared/cmd/cloudflared
 
 WORKDIR /go/src/github.com/cloudflare/cloudflared/cmd/cloudflared
+RUN git checkout ${REF}
 
 RUN DATE=$(date -u '+%Y-%m-%d-%H%M UTC') \
   VERSION=$(git describe --tags --always --dirty='-dev') \
